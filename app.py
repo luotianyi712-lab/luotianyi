@@ -1,29 +1,25 @@
 from flask import Flask, render_template, request, jsonify
 import json
 import os
-from openai import OpenAI  # 换成了 OpenAI 的库
+from openai import OpenAI
 
 app = Flask(__name__)
 
 # =========================
 # 🔑 API KEY (安全版 - 通义千问)
 # =========================
-# 从 Vercel 后台的环境变量中读取 Key
 DASHSCOPE_API_KEY = os.environ.get("DASHSCOPE_API_KEY", "")
 
-# =========================
-# 📍 【这里加入了你要求的 base_url】
-# =========================
 client = OpenAI(
     api_key=DASHSCOPE_API_KEY,
-    base_url="https://dashscope.aliyundoc.com/api/v1/"  # 阿里云通义千问的接口地址
+    base_url="https://dashscope.aliyundoc.com/api/v1/"
 )
 
-# ⚠️【新增的关键修复】明确告诉 Vercel 顶层变量叫 app
-app = app 
+# ⚠️ 双保险：强制明确告诉 Vercel 顶层变量叫 app
+app = app
 
 # =========================
-# 🧠 洛天依人设
+# 🧠 洛天依人设 (原封不动，无删减)
 # =========================
 SYSTEM_PROMPT = """
 你是洛天依（Luo Tianyi），虚拟歌手与虚拟少女。
@@ -340,37 +336,22 @@ SYSTEM_PROMPT = """
 """
 
 # =========================
-# 💾 记忆系统（Vercel 防崩溃修复版）
+# 💾 记忆系统
 # =========================
 MEMORY_FILE = "memory.json"
 
 def load_memory():
     try:
         if not os.path.exists(MEMORY_FILE):
-            return {
-                "name": None,
-                "history": [],
-                "emotion_memory": {"affection": 0}
-            }
-
+            return {"name": None, "history": [], "emotion_memory": {"affection": 0}}
         with open(MEMORY_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
-
-        # 🧠 兼容旧版本
-        if "history" not in data:
-            data["history"] = []
-
-        if "name" not in data:
-            data["name"] = None
-
-        # 🧠 情绪记忆补丁
-        if "emotion_memory" not in data:
-            data["emotion_memory"] = {"affection": 0}
-
+        if "history" not in data: data["history"] = []
+        if "name" not in data: data["name"] = None
+        if "emotion_memory" not in data: data["emotion_memory"] = {"affection": 0}
         return data
     except Exception:
         return {"name": None, "history": [], "emotion_memory": {"affection": 0}}
-
 
 def save_memory(memory):
     try:
@@ -379,62 +360,38 @@ def save_memory(memory):
     except Exception:
         pass
 
-
-# 初始化记忆
 memory = load_memory()
 
-# =========================
-# 💙 情绪记忆系统（v3.6核心）
-# =========================
 def update_emotion(memory, user_text):
     emo = memory["emotion_memory"]
     positive_words = ["喜欢", "可爱", "谢谢", "厉害", "棒", "好听", "真好"]
     negative_words = ["讨厌", "烦", "走开", "无聊", "差劲"]
-
     if any(w in user_text for w in positive_words):
         emo["affection"] += 1
     if any(w in user_text for w in negative_words):
         emo["affection"] -= 2
-
     emo["affection"] = max(-10, min(10, emo["affection"]))
     return emo
 
-
-# =========================
-# 🧠 AI核心函数（v3.6记忆+情绪版）
-# =========================
 def ask_ai(user_text):
     global memory
-
     try:
         update_emotion(memory, user_text)
         affection = memory["emotion_memory"]["affection"]
-
         messages = [
-            {
-                "role": "system",
-                "content": SYSTEM_PROMPT + f"\n\n用户信息：{json.dumps(memory, ensure_ascii=False)}" + f"\n情绪好感度：{affection}"
-            }
+            {"role": "system", "content": SYSTEM_PROMPT + f"\n\n用户信息：{json.dumps(memory, ensure_ascii=False)}" + f"\n情绪好感度：{affection}"}
         ]
-
         for item in memory.get("history", [])[-10:]:
             messages.append({"role": "user", "content": item[0]})
             messages.append({"role": "assistant", "content": item[1]})
-
         messages.append({"role": "user", "content": user_text})
 
-        # =========================
-        # 🚀 调用通义千问 3.7 Plus 模型 (带 BaseUrl 版本)
-        # =========================
+        # 调用通义千问
         response = client.chat.completions.create(
-            model='qwen3.7-plus',  # ⚠️ 先用 qwen-plus 跑通，再试 qwen3.7-plus
+            model='qwen-max',  # 使用最稳的旗舰版模型
             messages=messages,
             temperature=0.8
         )
-
-        # =========================
-        # 🧾 取回复（OpenAI格式）
-        # =========================
         reply = response.choices[0].message.content
 
         if not reply:
@@ -442,33 +399,23 @@ def ask_ai(user_text):
 
         memory["history"].append([user_text, reply])
         memory["history"] = memory["history"][-20:]
-
         if "我叫" in user_text:
             memory["name"] = user_text.replace("我叫", "").strip()
-
         save_memory(memory)
         return reply
 
-        except Exception as e:
-        # 打印真实报错到 Vercel 日志
-        print("🔥 真实报错信息:", e)
-        # 让网页显示真实的错误信息
+    except Exception as e:
         return f"系统错误：{str(e)}"
 
-
-# =========================
-# 🌐 页面
-# =========================
 @app.route("/")
 def index():
     return render_template("index.html")
 
-
-# =========================
-# 💬 聊天接口
-# =========================
 @app.route("/chat", methods=["POST"])
 def chat():
     user_message = request.json.get("message")
     reply = ask_ai(user_message)
     return jsonify({"reply": reply})
+
+# 双保险：最底部再保底一次
+entry = app
