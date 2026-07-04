@@ -449,10 +449,11 @@ def ask_ai(user_text):
         save_memory(memory)
         return reply
 
-    except Exception as e:
-        # 打印真实报错，方便排查
-        print("🔥 Vercel 报错:", e)
-        return f"嗯……系统有点卡住了（{e}）"
+        except Exception as e:
+        # 打印真实报错到 Vercel 日志
+        print("🔥 真实报错信息:", e)
+        # 让网页显示真实的错误信息
+        return f"系统错误：{str(e)}"
 
 
 # =========================
