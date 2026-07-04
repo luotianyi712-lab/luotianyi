@@ -388,7 +388,7 @@ def ask_ai(user_text):
 
         # 调用通义千问
         response = client.chat.completions.create(
-            model='qwen-max',  # 使用最稳的旗舰版模型
+            model='qwen3.7-plus',  # 使用最稳的旗舰版模型
             messages=messages,
             temperature=0.8
         )
