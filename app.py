@@ -391,6 +391,7 @@ def ask_ai(user_text):
             model='qwen3.7-plus',  # 使用最稳的旗舰版模型
             messages=messages,
             temperature=0.8
+            timeout=30
         )
         reply = response.choices[0].message.content
 
